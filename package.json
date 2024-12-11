@@ -1,0 +1,26 @@
+{
+    "name": "mpfetch",
+    "private": false,
+    "version": "0.0.1",
+    "type": "module",
+    "files": [
+        "./dist"
+    ],
+    "main": "./dist/mpfetch.umd.cjs",
+    "module": "./dist/mpfetch.js",
+    "types": "./dist/mpfetch.d.ts",
+    "exports": {
+        "types": "./dist/mpfetch.d.ts",
+        "import": "./dist/mpfetch.js",
+        "require": "./dist/mpfetch.umd.cjs"
+    },
+    "scripts": {
+        "dev": "vite --port 5500",
+        "build": "tsc && vite build"
+    },
+    "devDependencies": {
+        "typescript": "~5.7.2",
+        "vite": "^6.0.3",
+        "vite-plugin-dts": "^4.3.0"
+    }
+}
