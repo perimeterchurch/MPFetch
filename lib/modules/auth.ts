@@ -1,4 +1,4 @@
-class MPAuth {
+class Auth {
     static getToken = () => {
         let userToken = localStorage.getItem('mpp-widgets_AuthToken');
 
@@ -36,4 +36,4 @@ class MPAuth {
     };
 }
 
-export { MPAuth };
+export { Auth };

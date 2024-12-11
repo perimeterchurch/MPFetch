@@ -1,32 +1,34 @@
-import { MPAuth as Auth } from './modules/auth';
-import { MPFetch as Api } from './modules/api';
+import { Auth } from './modules/auth';
+import { API } from './modules/api';
 
-const getData = async (opts: {
-    host: string;
-    storedProc: string;
-    params?: string;
-    requireUser?: boolean;
-}) => {
-    let url = `https://${opts.host}.cloudapps.ministryplatform.cloud/sky/api/CustomWidget?storedProcedure=${opts.storedProc}`;
+class MPFetch {
+    static getData = async (opts: {
+        host: string;
+        storedProc: string;
+        params?: string;
+        requireUser?: boolean;
+    }) => {
+        let url = `https://${opts.host}.cloudapps.ministryplatform.cloud/sky/api/CustomWidget?storedProcedure=${opts.storedProc}`;
 
-    if (opts.params) {
-        url += `&spParams=${Api.encodeParams(opts.params)}`;
-    }
-
-    if (opts.requireUser) {
-        let user = Auth.checkUser();
-
-        if (!user) {
-            console.error('User not logged in!');
-            return null;
+        if (opts.params) {
+            url += `&spParams=${API.encodeParams(opts.params)}`;
         }
 
-        url += `&requireUser=true&userData=${user}`;
+        if (opts.requireUser) {
+            let user = Auth.checkUser();
 
-        return await Api.fetchData(url, user);
-    }
+            if (!user) {
+                console.error('User not logged in!');
+                return null;
+            }
 
-    return await Api.fetchData(url);
-};
+            url += `&requireUser=true&userData=${user}`;
 
-export { getData };
+            return await API.fetchData(url, user);
+        }
+
+        return await API.fetchData(url);
+    };
+}
+
+export { MPFetch };

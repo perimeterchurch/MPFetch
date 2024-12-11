@@ -1,4 +1,4 @@
-class MPFetch {
+class API {
     static getParamByName = (param: string, url = window.location.href) => {
         let name = param
             .replace('[', '')
@@ -61,4 +61,4 @@ class MPFetch {
     };
 }
 
-export { MPFetch };
+export { API };
