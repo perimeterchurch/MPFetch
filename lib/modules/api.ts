@@ -1,3 +1,5 @@
+import { Log } from './logging';
+
 class API {
     static getParamByName = (param: string, url = window.location.href) => {
         let name = param
@@ -40,6 +42,7 @@ class API {
         let headers = new Headers();
 
         if (userToken) {
+            Log.debug('API/fetchData: Setting authorization header...');
             headers.set('Authorization', `${userToken}`);
         }
 
@@ -48,15 +51,22 @@ class API {
             headers: headers,
         });
 
+        Log.debug('API/fetchData: Fetching data...');
         let response = await fetch(request);
 
         if (!response.ok) {
             const errorResponse = await response.json();
-            console.error(errorResponse.error, errorResponse.details);
-            return;
+            Log.error(
+                'API/fetchData: Error fetching data!',
+                errorResponse.error,
+                errorResponse.details
+            );
+            return null;
         }
 
         const data = await response.json();
+
+        Log.debug('API/fetchData: Data fetched successfully!');
         return data;
     };
 }
