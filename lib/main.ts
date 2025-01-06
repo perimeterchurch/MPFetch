@@ -1,6 +1,7 @@
 import { Auth } from './modules/auth';
 import { API } from './modules/api';
 import { Log } from './modules/logging';
+
 class MPFetch {
     static getData = async (opts: {
         host: string;
@@ -12,6 +13,7 @@ class MPFetch {
         Log.debugMode = opts.debug || false;
 
         let url = `https://${opts.host}.cloudapps.ministryplatform.cloud/sky/api/CustomWidget?storedProcedure=${opts.storedProc}`;
+        let user: string | null = null;
 
         Log.debug('API URL:', url);
 
@@ -27,20 +29,24 @@ class MPFetch {
 
             Log.debug('Getting user...');
 
-            let user = Auth.getUser();
+            user = Auth.getUser();
 
             if (!user) {
-                Log.error('No user found!');
-                return null;
+                Log.error('No user found! Checking again...');
+
+                user = await Auth.recheckAuth();
+
+                if (!user) {
+                    Log.error('No user found!');
+                    return null;
+                }
             }
 
             Log.debug('User found!');
             url += `&userData=${user}`;
-
-            return await API.fetchData(url, user);
         }
 
-        return await API.fetchData(url);
+        return await API.fetchData(url, user);
     };
 }
 

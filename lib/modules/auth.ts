@@ -1,6 +1,8 @@
 import { Log } from './logging';
 
 class Auth {
+    static checkCount: number | null = null;
+
     static getToken = () => {
         Log.debug('Auth/getToken: Getting user token from local storage...');
 
@@ -57,6 +59,31 @@ class Auth {
 
         Log.debug('Auth/getUser: User data found!');
         return userToken;
+    };
+
+    static recheckAuth = async (
+        numChecks: number = 5,
+        timeout: number = 4000
+    ) => {
+        if (!this.checkCount) {
+            this.checkCount = 0;
+        }
+
+        let sleep = new Promise((resolve) => setTimeout(resolve, timeout));
+
+        while (this.checkCount < numChecks) {
+            Log.debug('Auth/recheckAuth: Waiting 5 seconds...');
+            await sleep;
+            Log.debug('Auth/recheckAuth: Done waiting.');
+
+            this.checkCount++;
+
+            let user = this.getUser();
+
+            if (user) return user;
+        }
+
+        return null;
     };
 }
 
