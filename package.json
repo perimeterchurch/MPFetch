@@ -2,7 +2,7 @@
     "name": "ministryplatform-fetch",
     "homepage": "https://github.com/perimeterchurch/MPFetch",
     "private": false,
-    "version": "0.0.3",
+    "version": "0.1.0",
     "description": "A library for fetching data from MinistryPlatform using the customwidget API",
     "keywords": [
         "ministryplatform",
@@ -25,7 +25,8 @@
     },
     "scripts": {
         "dev": "vite --port 5500",
-        "build": "tsc && vite build"
+        "check-types": "tsc --noEmit",
+        "build": "vite build"
     },
     "devDependencies": {
         "typescript": "~5.7.3",
