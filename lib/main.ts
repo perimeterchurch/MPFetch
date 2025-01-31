@@ -9,44 +9,59 @@ class MPFetch {
         params?: string;
         requireUser?: boolean;
         debug?: boolean;
-    }) => {
+    }): Promise<{ data?: any; error?: any }> => {
         Log.debugMode = opts.debug || false;
 
         let url = `https://${opts.host}.cloudapps.ministryplatform.cloud/sky/api/CustomWidget?storedProcedure=${opts.storedProc}`;
         let user: string | null = null;
 
-        Log.debug('API URL:', url);
-
         if (opts.params) {
             let encodedParams = API.encodeParams(opts.params);
             url += `&spParams=${encodedParams}`;
-
-            Log.debug('Encoded params:', encodedParams);
         }
 
         if (opts.requireUser) {
             url += `&requireUser=true`;
 
-            Log.debug('Getting user...');
-
             user = Auth.getUser();
 
             if (!user) {
-                Log.error('No user found! Checking again...');
-
                 user = await Auth.recheckAuth();
 
                 if (!user) {
-                    Log.error('No user found!');
-                    return null;
+                    return {
+                        data: null,
+                        error: 'No user found!',
+                    };
                 }
             }
 
-            Log.debug('User found!');
             url += `&userData=${user}`;
         }
 
-        return await API.fetchData(url, user);
+        let response = await API.fetchData(url, user);
+
+        if (!response) {
+            return {
+                data: null,
+                error: 'No data returned from API',
+            };
+        }
+
+        if (response.error) {
+            return {
+                data: null,
+                error: {
+                    message: response.error,
+                    details: response.details || null,
+                },
+            };
+        }
+
+        return {
+            data: response,
+            error: null,
+        };
     };
 }
 
