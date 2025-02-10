@@ -1,67 +1,81 @@
 import { Auth } from './modules/auth';
 import { API } from './modules/api';
-import { Log } from './modules/logging';
+
+type APIResponse = {
+    data?: any;
+    error?: any;
+};
+
+const withParams = (url: string, params: string) => {
+    let encodedParams = API.encodeParams(params);
+    return url + `&spParams=${encodedParams}`;
+};
+
+const withUser = (url: string, userToken: string) => {
+    return url + `&requireUser=true&userData=${userToken}`;
+};
 
 class MPFetch {
+    /**
+     * Fetches data from the MinistryPlatform custom widget API
+     * @param opts - Options passed to the API call
+     * @returns Promise<{ data?: any; error?: any }>
+     */
     static getData = async (opts: {
         host: string;
         storedProc: string;
         params?: string;
         requireUser?: boolean;
         debug?: boolean;
-    }): Promise<{ data?: any; error?: any }> => {
-        Log.debugMode = opts.debug || false;
-
+    }): Promise<APIResponse> => {
+        // API endpoint
         let url = `https://${opts.host}.cloudapps.ministryplatform.cloud/sky/api/CustomWidget?storedProcedure=${opts.storedProc}`;
-        let user: string | null = null;
+        let response: APIResponse = {
+            data: null,
+            error: null,
+        };
 
+        // User token used for authentication to the API
+        let userToken: string | null = null;
+
+        // If there are any params, encode them and add them to the URL
         if (opts.params) {
-            let encodedParams = API.encodeParams(opts.params);
-            url += `&spParams=${encodedParams}`;
+            url = withParams(url, opts.params);
         }
 
+        // If the user is required, add the requireUser flag and userData token to the URL
         if (opts.requireUser) {
-            url += `&requireUser=true`;
+            // Get the user token from local storage, or check if it's expired and refresh it
+            userToken = await Auth.getUser();
 
-            user = Auth.getUser();
-
-            if (!user) {
-                user = await Auth.recheckAuth();
-
-                if (!user) {
-                    return {
-                        data: null,
-                        error: 'No user found!',
-                    };
-                }
+            // If no user token is found, return an error response
+            if (!userToken) {
+                return {
+                    data: null,
+                    error: 'No user found!',
+                };
             }
 
-            url += `&userData=${user}`;
+            // Add the user token to the URL
+            url = withUser(url, userToken);
+
+            // Fetch the data from the API with the user token
+            response = await API.fetchData(url, userToken);
+        } else {
+            // Fetch the data from the API
+            response = await API.fetchData(url);
         }
 
-        let response = await API.fetchData(url, user);
+        // If there is an error, return an error response
 
         if (!response) {
-            return {
+            response = {
                 data: null,
                 error: 'No data returned from API',
             };
         }
 
-        if (response.error) {
-            return {
-                data: null,
-                error: {
-                    message: response.error,
-                    details: response.details || null,
-                },
-            };
-        }
-
-        return {
-            data: response,
-            error: null,
-        };
+        return response;
     };
 }
 
