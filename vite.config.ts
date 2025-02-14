@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
-import dts from 'vite-plugin-dts';
+import biomePlugin from 'vite-plugin-biome';
+import dtsPlugin from 'vite-plugin-dts';
 
 export default defineConfig({
     build: {
@@ -10,7 +11,7 @@ export default defineConfig({
         },
     },
     plugins: [
-        dts({
+        dtsPlugin({
             tsconfigPath: './tsconfig.json',
             include: ['lib/**/*.ts'],
             outDir: 'dist',
@@ -19,6 +20,12 @@ export default defineConfig({
                 filePath: filePath.replace('main.d.ts', 'mpfetch.d.ts'),
                 content,
             }),
+        }),
+        biomePlugin({
+            mode: 'check',
+            files: '.',
+            applyFixes: false,
+            failOnError: true,
         }),
     ],
 });

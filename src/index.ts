@@ -1,6 +1,6 @@
 import { MPFetch } from '../lib/main';
 
-let app = document.getElementById('app');
+const app = document.getElementById('app');
 if (app) {
     const response = await MPFetch.getData({
         host: 'perimeter',

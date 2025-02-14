@@ -1,14 +1,14 @@
 type APIData = {
-    DataSet1?: any;
-    DataSet2?: any;
-    DataSet3?: any;
-    DataSet4?: any;
-    DataSet5?: any;
-    DataSet6?: any;
-    DataSet7?: any;
-    DataSet8?: any;
-    DataSet9?: any;
-    DataSet10?: any;
+    DataSet1?: unknown;
+    DataSet2?: unknown;
+    DataSet3?: unknown;
+    DataSet4?: unknown;
+    DataSet5?: unknown;
+    DataSet6?: unknown;
+    DataSet7?: unknown;
+    DataSet8?: unknown;
+    DataSet9?: unknown;
+    DataSet10?: unknown;
 };
 
 type APIError = {

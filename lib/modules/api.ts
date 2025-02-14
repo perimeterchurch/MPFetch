@@ -1,75 +1,78 @@
-import { APIResponse } from '../types/api';
+import type { APIResponse } from '../types/api';
 
-class API {
-    static getParamByName = (param: string, url = window.location.href) => {
-        let name = param
-            .replace('[', '')
-            .replace(']', '')
-            .replace('/[[]]/g', '\\$&');
+const getParamByName = (param: string, url = window.location.href) => {
+    const name = param
+        .replace('[', '')
+        .replace(']', '')
+        .replace('/[[]]/g', '\\$&');
 
-        let regex = new RegExp(`[?&]${name}(=([^&#]*)|&|#|$)`);
-        let results = regex.exec(url);
+    const regex = new RegExp(`[?&]${name}(=([^&#]*)|&|#|$)`);
+    const results = regex.exec(url);
 
-        if (!results) return null;
-        if (!results[2]) return '';
+    if (!results) return null;
+    if (!results[2]) return '';
 
-        return decodeURIComponent(results[2].replace(/\+/g, ' '));
-    };
+    return decodeURIComponent(results[2].replace(/\+/g, ' '));
+};
 
-    static replaceParams = (params: string) => {
-        let newParams = params;
+const replaceParams = (params: string) => {
+    let newParams = params;
 
-        let regex = /\[.*?]/gi;
-        let match = null;
-        while ((match = regex.exec(newParams)) != null) {
-            let paramName = this.getParamByName(match[0]);
-            if (paramName) {
-                newParams = newParams.replace(match[0], paramName);
-            }
+    const regex = /\[.*?]/gi;
+    let match = regex.exec(newParams);
+    while (match) {
+        const paramName = getParamByName(match[0]);
+        if (paramName) {
+            newParams = newParams.replace(match[0], paramName);
         }
 
-        return newParams;
-    };
+        match = regex.exec(newParams);
+    }
 
-    static encodeParams = (params: string) => {
-        return encodeURIComponent(this.replaceParams(params));
-    };
+    return newParams;
+};
 
-    static fetchData = async (
-        endpoint: string,
-        userToken: string | null = null
-    ): Promise<APIResponse> => {
-        let headers = new Headers();
+const encodeParams = (params: string) => {
+    return encodeURIComponent(replaceParams(params));
+};
 
-        if (userToken) {
-            headers.set('Authorization', `${userToken}`);
-        }
+const fetchData = async (
+    endpoint: string,
+    userToken: string | null = null,
+): Promise<APIResponse> => {
+    const headers = new Headers();
 
-        let request = new Request(endpoint, {
-            method: 'GET',
-            headers: headers,
-        });
+    if (userToken) {
+        headers.set('Authorization', `${userToken}`);
+    }
 
-        let response = await fetch(request);
+    const request = new Request(endpoint, {
+        method: 'GET',
+        headers: headers,
+    });
 
-        if (!response.ok) {
-            let responseData = await response.json();
+    const response = await fetch(request);
 
-            return {
-                data: null,
-                error: {
-                    status: response.status,
-                    message: responseData.error,
-                    // details: responseData.details || null,
-                },
-            };
-        }
+    if (!response.ok) {
+        const responseData = await response.json();
 
         return {
-            data: await response.json(),
-            error: null,
+            data: null,
+            error: {
+                status: response.status,
+                message: responseData.error,
+                // details: responseData.details || null,
+            },
         };
-    };
-}
+    }
 
-export { API };
+    return {
+        data: await response.json(),
+        error: null,
+    };
+};
+
+export const API = {
+    fetchData,
+    encodeParams,
+};
