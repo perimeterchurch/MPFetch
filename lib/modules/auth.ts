@@ -1,67 +1,79 @@
 class Auth {
-    static checkCount: number | null = null;
-
-    static getToken = () => {
-        let userToken = localStorage.getItem('mpp-widgets_AuthToken');
-
-        if (!userToken || userToken == 'null' || userToken.length < 10) {
-            return null;
-        }
-
-        return userToken;
-    };
-
-    static getExpiration = () => {
+    /**
+     * Gets the user token expiration date from local storage and checks if it's expired
+     * @returns boolean
+     */
+    static checkTokenExpiration = (): boolean => {
         let expireData = localStorage.getItem('mpp-widgets_ExpiresAfter');
 
-        if (!expireData) {
-            return null;
+        if (!expireData || expireData == 'null') {
+            return false;
         }
 
-        return Date.parse(expireData);
-    };
-
-    static checkExpiration = () => {
-        let expirationDate = this.getExpiration();
-
-        if (!expirationDate || expirationDate < Date.now()) {
+        if (Date.parse(expireData) < Date.now()) {
             return false;
         }
 
         return true;
     };
 
-    static getUser = async () => {
-        let userToken = this.getToken();
+    /**
+     * Gets the user token from local storage and checks if it's expired
+     * @returns string | null
+     */
+    static getUserToken = (): string | null => {
+        let userToken = localStorage.getItem('mpp-widgets_AuthToken');
 
-        if (!userToken || !this.checkExpiration()) {
-            userToken = await this.recheckAuth();
+        if (!userToken || userToken == 'null' || userToken.length < 10) {
+            return null;
+        }
+
+        if (!this.checkTokenExpiration()) {
+            return null;
         }
 
         return userToken;
     };
 
-    static recheckAuth = async (
+    /**
+     * Attempts to fetch the user token multiple times
+     * @param numChecks - The number of times to check if the token is expired
+     * @param timeout - The timeout in milliseconds between checks
+     * @returns Promise<string | null>
+     */
+    static refetchUserToken = async (
         numChecks: number = 5,
         timeout: number = 4000
     ): Promise<string | null> => {
-        if (!this.checkCount) {
-            this.checkCount = 0;
-        }
-
         let sleep = new Promise((resolve) => setTimeout(resolve, timeout));
 
-        while (this.checkCount < numChecks) {
+        let fetchCount = 0;
+        let userToken: string | null = null;
+        while (fetchCount < numChecks) {
             await sleep;
 
-            this.checkCount++;
+            fetchCount++;
 
-            let user = this.getUser();
+            userToken = this.getUserToken();
 
-            if (user) return user;
+            if (userToken) return userToken;
+
+            userToken = null;
         }
 
         return null;
+    };
+
+    /**
+     * Fetches and verifies the user token
+     * @returns Promise<string | null>
+     */
+    static fetchUserToken = async (): Promise<string | null> => {
+        let userToken = this.getUserToken();
+
+        if (!userToken) userToken = await this.refetchUserToken();
+
+        return userToken;
     };
 }
 

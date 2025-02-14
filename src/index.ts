@@ -9,7 +9,5 @@ if (app) {
         debug: true,
     });
 
-    console.debug('response', response);
-    console.debug('response.data', response.data);
-    console.debug('response.error', response.error);
+    console.log(response);
 }

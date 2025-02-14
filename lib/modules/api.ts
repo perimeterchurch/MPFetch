@@ -1,3 +1,5 @@
+import { APIResponse } from '../types/api';
+
 class API {
     static getParamByName = (param: string, url = window.location.href) => {
         let name = param
@@ -18,7 +20,7 @@ class API {
         let newParams = params;
 
         let regex = /\[.*?]/gi;
-        let match;
+        let match = null;
         while ((match = regex.exec(newParams)) != null) {
             let paramName = this.getParamByName(match[0]);
             if (paramName) {
@@ -36,7 +38,7 @@ class API {
     static fetchData = async (
         endpoint: string,
         userToken: string | null = null
-    ) => {
+    ): Promise<APIResponse> => {
         let headers = new Headers();
 
         if (userToken) {
@@ -51,10 +53,22 @@ class API {
         let response = await fetch(request);
 
         if (!response.ok) {
-            return null;
+            let responseData = await response.json();
+
+            return {
+                data: null,
+                error: {
+                    status: response.status,
+                    message: responseData.error,
+                    // details: responseData.details || null,
+                },
+            };
         }
 
-        return await response.json();
+        return {
+            data: await response.json(),
+            error: null,
+        };
     };
 }
 
