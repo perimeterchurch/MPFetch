@@ -1,12 +1,7 @@
 {
     "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
     "files": {
-        "include": [
-            "lib/**/*.ts",
-            "src/**/*.ts",
-            "index.html",
-            "vite.config.ts"
-        ]
+        "include": ["lib/**/*", "src/**/*", "index.html", "vite.config.ts"]
     },
     "vcs": {
         "enabled": true,
@@ -21,7 +16,6 @@
     },
     "formatter": {
         "enabled": true,
-        "ignore": ["dist/**/*"],
         "formatWithErrors": true,
         "indentStyle": "space",
         "indentWidth": 4,
