@@ -1,5 +1,4 @@
 import { defineConfig } from 'vite';
-import biomePlugin from 'vite-plugin-biome';
 import dtsPlugin from 'vite-plugin-dts';
 
 export default defineConfig({
@@ -20,12 +19,6 @@ export default defineConfig({
                 filePath: filePath.replace('main.d.ts', 'mpfetch.d.ts'),
                 content,
             }),
-        }),
-        biomePlugin({
-            mode: 'check',
-            files: '.',
-            applyFixes: false,
-            failOnError: true,
         }),
     ],
 });
