@@ -11,6 +11,10 @@ const addUser = (url: string, userToken: string) => {
     return `${url}&requireUser=true&userData=${userToken}`;
 };
 
+const addCache = (url: string, cache: boolean) => {
+    return `${url}&cacheData=${cache}`;
+};
+
 /**
  * Fetches data from the MinistryPlatform custom widget API
  * @param opts - Options passed to the API call
@@ -22,6 +26,7 @@ const getData = async (opts: {
     params?: string;
     requireUser?: boolean;
     debug?: boolean;
+    cache?: boolean;
 }): Promise<APIResponse> => {
     // API endpoint
     let url = `https://${opts.host}.cloudapps.ministryplatform.cloud/sky/api/CustomWidget?storedProcedure=${opts.storedProc}`;
@@ -41,6 +46,8 @@ const getData = async (opts: {
         // Add the user token to the URL
         url = addUser(url, userToken || '');
     }
+
+    url = addCache(url, opts.cache || false);
 
     return await API.fetchData(url, userToken || null);
 };
