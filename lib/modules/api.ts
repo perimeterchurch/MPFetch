@@ -39,11 +39,16 @@ const encodeParams = (params: string) => {
 const fetchData = async (
     endpoint: string,
     userToken: string | null = null,
+    cache: boolean,
 ): Promise<APIResponse> => {
     const headers = new Headers();
 
     if (userToken) {
         headers.set('Authorization', `${userToken}`);
+    }
+
+    if (!cache) {
+        headers.set('Cache-Control', 'no-cache');
     }
 
     const request = new Request(endpoint, {
@@ -61,7 +66,6 @@ const fetchData = async (
             error: {
                 status: response.status,
                 message: responseData.error,
-                // details: responseData.details || null,
             },
         };
     }

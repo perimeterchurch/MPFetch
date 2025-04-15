@@ -47,9 +47,19 @@ const getData = async (opts: {
         url = addUser(url, userToken || '');
     }
 
+    if (opts.cache) {
+        url = addCache(url, opts.cache);
+    } else {
+        url = addCache(url, false);
+    }
+
     url = addCache(url, opts.cache || false);
 
-    return await API.fetchData(url, userToken || null);
+    if (opts.debug) {
+        console.log('MPFetch URL', url);
+    }
+
+    return await API.fetchData(url, userToken || null, opts.cache || false);
 };
 
 export const MPFetch = { getData };
