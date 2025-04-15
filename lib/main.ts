@@ -12,7 +12,7 @@ const addUser = (url: string, userToken: string) => {
 };
 
 const addCache = (url: string, cache: boolean) => {
-    return `${url}&cacheData=${cache}`;
+    return `${url}&cacheData=${cache ? 'true' : 'false'}`;
 };
 
 /**
