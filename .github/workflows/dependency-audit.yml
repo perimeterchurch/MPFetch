@@ -1,0 +1,171 @@
+# Known vulnerabilities in this repository's dependencies, checked monthly.
+#
+# The same file is in every perimeterchurch repository that has a lockfile,
+# so it finds what to audit rather than being told: every package-lock.json
+# (npm audit), pnpm-lock.yaml (pnpm audit) and requirements*.txt (pip-audit),
+# outside node_modules. It reads lockfiles only and installs nothing of the
+# project's.
+#
+# It runs on the 1st of each month, because a repository nobody touched can
+# still turn vulnerable as advisories are published, and whenever a lockfile
+# changes. When it finds something it opens a GitHub issue, or comments on the
+# one already open, and the run fails. A run that cannot complete fails with
+# no issue: "the audit did not run" and "the audit found problems" need
+# different responses.
+#
+# Moderate, high and critical advisories are reported; low ones are left to
+# GitHub's Dependabot alerts, which are on for every repository in the org.
+
+name: dependency audit
+
+on:
+  schedule:
+    # The 1st of each month, 13:23 UTC (09:23 Eastern in summer). Off the
+    # hour, when GitHub's scheduler is least congested.
+    - cron: "23 13 1 * *"
+  push:
+    paths:
+      - "**/package-lock.json"
+      - "**/pnpm-lock.yaml"
+      - "**/requirements*.txt"
+      - ".github/workflows/dependency-audit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  # To open or comment on the issue that reports a finding. Nothing else.
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Audit
+        id: audit
+        run: |
+          # Not -e: every auditor exits non-zero when it finds something,
+          # which is the case this step exists to report.
+          set +e
+          found=0
+          broken=0
+          : > report.md
+          files=$(find . \( -name node_modules -o -name .git \) -prune -o \
+            \( -name package-lock.json -o -name pnpm-lock.yaml -o -name 'requirements*.txt' \) \
+            -type f -print | sort)
+
+          if [ -z "$files" ]; then
+            echo "No lockfiles to audit." >> "$GITHUB_STEP_SUMMARY"
+            echo "found=no" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # One table row per advisory: package | severity | affected | fixed in | advisory.
+          # A range's own "||" is escaped, or it splits the row into extra columns.
+          for f in $files; do
+            dir=$(dirname "$f")
+            name=$(basename "$f")
+            rows=""
+            case "$name" in
+              package-lock.json)
+                (cd "$dir" && npm audit --package-lock-only --json > "$RUNNER_TEMP/a.json" 2>/dev/null)
+                if jq -e '.vulnerabilities' "$RUNNER_TEMP/a.json" > /dev/null 2>&1; then
+                  rows=$(jq -r '.vulnerabilities | to_entries[]
+                    | select(.value.severity | IN("moderate","high","critical"))
+                    | .value as $v
+                    | [$v.via[] | objects] as $adv
+                    | "\($v.name) | \($v.severity) | \($v.range | gsub("\\|"; "\\|")) | \(if ($v.fixAvailable|type) == "object" then "upgrade \($v.fixAvailable.name) to \($v.fixAvailable.version)\(if $v.fixAvailable.isSemVerMajor then " (major version)" else "" end)" elif $v.fixAvailable == true then "`npm audit fix`" else "no fix yet" end) | \(if ($adv|length) > 0 then ($adv | map("[\(.title)](\(.url))") | unique | join("<br>")) else "via " + ([$v.via[] | strings] | join(", ")) end)"' "$RUNNER_TEMP/a.json")
+                else
+                  broken=1; echo "- npm audit could not read \`$f\`." >> "$RUNNER_TEMP/broken.md"
+                fi
+                ;;
+              pnpm-lock.yaml)
+                (cd "$dir" && npx --yes pnpm@9.15.0 audit --json > "$RUNNER_TEMP/a.json" 2>/dev/null)
+                if jq -e '.advisories' "$RUNNER_TEMP/a.json" > /dev/null 2>&1; then
+                  rows=$(jq -r '.advisories[]
+                    | select(.severity | IN("moderate","high","critical"))
+                    | "\(.module_name) | \(.severity) | \(.vulnerable_versions | gsub("\\|"; "\\|")) | \(.patched_versions | gsub("\\|"; "\\|")) | [\(.title)](\(.url))"' "$RUNNER_TEMP/a.json")
+                else
+                  broken=1; echo "- pnpm audit could not read \`$f\`." >> "$RUNNER_TEMP/broken.md"
+                fi
+                ;;
+              requirements*.txt)
+                python -m pip install --quiet pip-audit==2.10.1 > /dev/null
+                pip-audit -r "$f" --progress-spinner off --desc off --format json \
+                  > "$RUNNER_TEMP/a.json" 2>/dev/null
+                if jq -e '.dependencies' "$RUNNER_TEMP/a.json" > /dev/null 2>&1; then
+                  rows=$(jq -r '.dependencies[] | .name as $n | .version as $ver | .vulns[]
+                    | "\($n) | - | \($ver) | \(.fix_versions | join(", ")) | [\(.id)](https://osv.dev/vulnerability/\(.id))"' "$RUNNER_TEMP/a.json")
+                else
+                  broken=1; echo "- pip-audit could not resolve \`$f\`." >> "$RUNNER_TEMP/broken.md"
+                fi
+                ;;
+            esac
+            if [ -n "$rows" ]; then
+              found=1
+              {
+                echo "### \`$f\`"
+                echo
+                echo "Package | Severity | Affected | Fixed in | Advisory"
+                echo "--- | --- | --- | --- | ---"
+                echo "$rows" | sort -u
+                echo
+              } >> report.md
+            fi
+          done
+
+          if [ "$found" -eq 1 ]; then
+            cat report.md >> "$GITHUB_STEP_SUMMARY"
+            echo "found=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "No known moderate, high or critical vulnerabilities." >> "$GITHUB_STEP_SUMMARY"
+            echo "found=no" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$broken" -eq 1 ]; then
+            { echo; echo "Could not audit:"; cat "$RUNNER_TEMP/broken.md"; } >> "$GITHUB_STEP_SUMMARY"
+            [ "$found" -eq 1 ] && cat "$RUNNER_TEMP/broken.md" >> report.md
+            echo "broken=yes" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Report
+        if: steps.audit.outputs.found == 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Dependency audit: known vulnerabilities in dependencies"
+          {
+            echo "The monthly dependency audit found advisories affecting this"
+            echo "repository's locked dependency versions."
+            echo
+            cat report.md
+            echo
+            echo "Upgrade each package to at least the version in *Fixed in*,"
+            echo "run the project's checks, and deploy. The run: $RUN_URL"
+          } > body.md
+
+          existing=$(gh issue list --state open --search "in:title \"$title\"" \
+            --json number --jq '.[0].number // empty' 2>/dev/null)
+          if [ -n "$existing" ]; then
+            # One issue per outstanding problem, not one a month for ever.
+            gh issue comment "$existing" --body-file body.md
+          else
+            # Issues may be switched off on a repository; the red run still says so.
+            gh issue create --title "$title" --body-file body.md || \
+              echo "Could not open an issue here; the findings are in the run summary."
+          fi
+          exit 1
+
+      - name: Could not complete
+        if: steps.audit.outputs.broken == 'yes' && steps.audit.outputs.found != 'yes'
+        run: |
+          echo "Some lockfiles could not be audited; see the run summary."
+          exit 1
