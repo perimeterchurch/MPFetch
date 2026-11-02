@@ -72,11 +72,12 @@ jobs:
           # A range's own "||" is escaped, or it splits the row into extra columns.
           for f in $files; do
             dir=$(dirname "$f")
+            : > "$RUNNER_TEMP/err.txt"
             name=$(basename "$f")
             rows=""
             case "$name" in
               package-lock.json)
-                (cd "$dir" && npm audit --package-lock-only --json > "$RUNNER_TEMP/a.json" 2>/dev/null)
+                (cd "$dir" && npm audit --package-lock-only --json > "$RUNNER_TEMP/a.json" 2> "$RUNNER_TEMP/err.txt")
                 if jq -e '.vulnerabilities' "$RUNNER_TEMP/a.json" > /dev/null 2>&1; then
                   rows=$(jq -r '.vulnerabilities | to_entries[]
                     | select(.value.severity | IN("moderate","high","critical"))
@@ -84,28 +85,28 @@ jobs:
                     | [$v.via[] | objects] as $adv
                     | "\($v.name) | \($v.severity) | \($v.range | gsub("\\|"; "\\|")) | \(if ($v.fixAvailable|type) == "object" then "upgrade \($v.fixAvailable.name) to \($v.fixAvailable.version)\(if $v.fixAvailable.isSemVerMajor then " (major version)" else "" end)" elif $v.fixAvailable == true then "`npm audit fix`" else "no fix yet" end) | \(if ($adv|length) > 0 then ($adv | map("[\(.title)](\(.url))") | unique | join("<br>")) else "via " + ([$v.via[] | strings] | join(", ")) end)"' "$RUNNER_TEMP/a.json")
                 else
-                  broken=1; echo "- npm audit could not read \`$f\`." >> "$RUNNER_TEMP/broken.md"
+                  broken=1; echo "- npm audit could not read \`$f\`: $(grep -m1 -v '^\s*$' "$RUNNER_TEMP/err.txt" | cut -c1-200)" >> "$RUNNER_TEMP/broken.md"
                 fi
                 ;;
               pnpm-lock.yaml)
-                (cd "$dir" && npx --yes pnpm@9.15.0 audit --json > "$RUNNER_TEMP/a.json" 2>/dev/null)
+                (cd "$dir" && npx --yes pnpm@10.12.1 audit --json > "$RUNNER_TEMP/a.json" 2> "$RUNNER_TEMP/err.txt")
                 if jq -e '.advisories' "$RUNNER_TEMP/a.json" > /dev/null 2>&1; then
                   rows=$(jq -r '.advisories[]
                     | select(.severity | IN("moderate","high","critical"))
                     | "\(.module_name) | \(.severity) | \(.vulnerable_versions | gsub("\\|"; "\\|")) | \(.patched_versions | gsub("\\|"; "\\|")) | [\(.title)](\(.url))"' "$RUNNER_TEMP/a.json")
                 else
-                  broken=1; echo "- pnpm audit could not read \`$f\`." >> "$RUNNER_TEMP/broken.md"
+                  broken=1; echo "- pnpm audit could not read \`$f\`: $(grep -m1 -v '^\s*$' "$RUNNER_TEMP/err.txt" | cut -c1-200)" >> "$RUNNER_TEMP/broken.md"
                 fi
                 ;;
               requirements*.txt)
                 python -m pip install --quiet pip-audit==2.10.1 > /dev/null
                 pip-audit -r "$f" --progress-spinner off --desc off --format json \
-                  > "$RUNNER_TEMP/a.json" 2>/dev/null
+                  > "$RUNNER_TEMP/a.json" 2> "$RUNNER_TEMP/err.txt"
                 if jq -e '.dependencies' "$RUNNER_TEMP/a.json" > /dev/null 2>&1; then
                   rows=$(jq -r '.dependencies[] | .name as $n | .version as $ver | .vulns[]
                     | "\($n) | - | \($ver) | \(.fix_versions | join(", ")) | [\(.id)](https://osv.dev/vulnerability/\(.id))"' "$RUNNER_TEMP/a.json")
                 else
-                  broken=1; echo "- pip-audit could not resolve \`$f\`." >> "$RUNNER_TEMP/broken.md"
+                  broken=1; echo "- pip-audit could not resolve \`$f\`: $(grep -m1 -v '^\s*$' "$RUNNER_TEMP/err.txt" | cut -c1-200)" >> "$RUNNER_TEMP/broken.md"
                 fi
                 ;;
             esac
@@ -151,6 +152,22 @@ jobs:
             echo "Upgrade each package to at least the version in *Fixed in*,"
             echo "run the project's checks, and deploy. The run: $RUN_URL"
           } > body.md
+
+          # An issue holds 65,536 characters. A repository with several
+          # lockfiles can find more than that, so list each package once
+          # without its advisories, and leave the detail on the run.
+          if [ "$(wc -c < body.md)" -gt 60000 ]; then
+            {
+              echo "The monthly dependency audit found more advisories than fit in an"
+              echo "issue. Each affected package is listed once; every advisory, with"
+              echo "links, is in the run summary: $RUN_URL"
+              echo
+              awk -F' [|] ' '/^### /{print; print ""; print "Package | Severity | Fixed in"; print "--- | --- | ---"; head=1; next}
+                /^[^#].* [|] (moderate|high|critical|-) [|] /{key=$1" | "$2" | "$4; if (!seen[key]++) print key; next}
+                /^$/{if (head) {head=0} else {print}}' report.md
+            } > body.md
+            head -c 64000 body.md > body.cut && mv body.cut body.md
+          fi
 
           existing=$(gh issue list --state open --search "in:title \"$title\"" \
             --json number --jq '.[0].number // empty' 2>/dev/null)
